@@ -9,6 +9,7 @@ type Point = { x: number; y: number };
 type Finger = "thumb" | "index" | "middle" | "ring" | "pinky";
 type FingerPoint = { hand: number; finger: Finger; x: number; y: number };
 type Calibration = { keys: Record<string, Point>; size: number };
+type CalibrationSnapshot = { calibration: Calibration; selectedKey: string };
 
 const keys = "qwertyuiopasdfghjkl;'zxcvbnm,./ ".split("");
 const keyRows = ["qwertyuiopasdfgh", "jkl;'zxcvbnm,./ "];
@@ -28,7 +29,7 @@ const fingerColors: Record<Finger, string> = {
   index: "#9ece6a",
   middle: "#e0af68",
   ring: "#ff9e64",
-  pinky: "#f7768e",
+  pinky: "#ff9e64",
 };
 const fingerTips: Record<Finger, number> = { thumb: 4, index: 8, middle: 12, ring: 16, pinky: 20 };
 const fingerLines: Record<Finger, number[]> = {
@@ -68,6 +69,14 @@ export function App() {
   const [debug, setDebug] = useState({ key: "-", expected: "-", finger: "-", result: "-" });
   const [score, setScore] = useState({ correct: 0, total: 0 });
   const [keyStats, setKeyStats] = useState(emptyStats);
+  const [startedAt, setStartedAt] = useState<number | null>(null);
+  const [sessionChars, setSessionChars] = useState(0);
+  const [now, setNow] = useState(Date.now());
+  const [calibrationOpen, setCalibrationOpen] = useState(true);
+  const [cameras, setCameras] = useState<MediaDeviceInfo[]>([]);
+  const [selectedCamera, setSelectedCamera] = useState("");
+  const [undoStack, setUndoStack] = useState<CalibrationSnapshot[]>([]);
+  const [redoStack, setRedoStack] = useState<CalibrationSnapshot[]>([]);
 
   useEffect(() => {
     let stopped = false;
@@ -77,6 +86,7 @@ export function App() {
     async function start() {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
+          ...(selectedCamera ? { deviceId: { exact: selectedCamera } } : {}),
           width: { ideal: 1920 },
           height: { ideal: 1080 },
           aspectRatio: { ideal: 16 / 9 },
@@ -86,6 +96,10 @@ export function App() {
       if (!videoRef.current) return;
       videoRef.current.srcObject = stream;
       await videoRef.current.play();
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter((device) => device.kind === "videoinput");
+      setCameras(videoDevices);
+      setSelectedCamera((value) => value || videoDevices[0]?.deviceId || "");
 
       const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm");
       landmarker = await HandLandmarker.createFromOptions(vision, {
@@ -109,11 +123,7 @@ export function App() {
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         ctx.clearRect(0, 0, rect.width, rect.height);
         const videoRect = containRect(video.videoWidth || 16, video.videoHeight || 9, rect.width, rect.height);
-        ctx.save();
-        ctx.translate(videoRect.x + videoRect.width, videoRect.y);
-        ctx.scale(-1, 1);
-        ctx.drawImage(video, 0, 0, video.videoWidth, video.videoHeight, 0, 0, videoRect.width, videoRect.height);
-        ctx.restore();
+        ctx.drawImage(video, videoRect.x, videoRect.y, videoRect.width, videoRect.height);
 
         const results = landmarker.detectForVideo(video, performance.now());
         fingersRef.current = extractFingers(results.landmarks, videoRect, rect.width, rect.height);
@@ -131,11 +141,17 @@ export function App() {
       const stream = videoRef.current?.srcObject as MediaStream | null;
       stream?.getTracks().forEach((track) => track.stop());
     };
-  }, []);
+  }, [selectedCamera]);
 
   useEffect(() => {
     localStorage.setItem("touchCalibration", JSON.stringify(calibration));
   }, [calibration]);
+
+  useEffect(() => {
+    if (!startedAt) return;
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [startedAt]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -151,8 +167,16 @@ export function App() {
       const key = event.key.toLowerCase();
       if (key.length !== 1) return;
       setTyped((value) => {
-        const next = value.length < prompt.length ? [...value, key] : value;
-        if (next.length === prompt.length) setTimeout(() => setPrompt(randomPrompt()), 0);
+        if (value.length >= prompt.length) return value;
+        setStartedAt((started) => started ?? Date.now());
+        setSessionChars((count) => count + 1);
+        setNow(Date.now());
+        const next = [...value, key];
+        if (next.length === prompt.length) {
+          setTimeout(() => {
+            setPrompt(randomPrompt());
+          }, 0);
+        }
         return next.length === prompt.length ? [] : next;
       });
       scoreKey(key);
@@ -162,6 +186,8 @@ export function App() {
   }, [calibration, prompt]);
 
   const heatmap = useMemo(() => keyStats, [keyStats]);
+  const elapsedMinutes = startedAt ? Math.max((now - startedAt) / 60000, 1 / 60000) : 0;
+  const wpm = elapsedMinutes ? Math.round(sessionChars / 5 / elapsedMinutes) : 0;
 
   function resetPractice() {
     setDebug({ key: "-", expected: "-", finger: "-", result: "-" });
@@ -195,35 +221,68 @@ export function App() {
   function placeKey(event: React.MouseEvent<HTMLElement>) {
     const rect = previewRef.current?.getBoundingClientRect();
     if (!rect) return;
-    setCalibration((value) => {
-      return {
-        ...value,
-        keys: {
-          ...value.keys,
-          [selectedKey]: {
-            x: Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width)),
-            y: Math.min(1, Math.max(0, (event.clientY - rect.top) / rect.height)),
-          },
-        },
-      };
-    });
+    setKeyPosition(selectedKey, event.clientX, event.clientY, rect);
     const next = keys[keys.indexOf(selectedKey) + 1];
     if (next) setSelectedKey(next);
   }
 
+  function setKeyPosition(key: string, clientX: number, clientY: number, rect = previewRef.current?.getBoundingClientRect()) {
+    if (!rect) return;
+    pushCalibration();
+    setCalibration((value) => ({
+      ...value,
+      keys: {
+        ...value.keys,
+        [key]: {
+          x: Math.min(1, Math.max(0, (clientX - rect.left) / rect.width)),
+          y: Math.min(1, Math.max(0, (clientY - rect.top) / rect.height)),
+        },
+      },
+    }));
+  }
+
+  function pushCalibration() {
+    setUndoStack((stack) => [...stack, { calibration, selectedKey }]);
+    setRedoStack([]);
+  }
+
+  function undoCalibration() {
+    setUndoStack((stack) => {
+      const previous = stack.at(-1);
+      if (!previous) return stack;
+      setRedoStack((redo) => [...redo, { calibration, selectedKey }]);
+      setCalibration(previous.calibration);
+      setSelectedKey(previous.selectedKey);
+      return stack.slice(0, -1);
+    });
+  }
+
+  function redoCalibration() {
+    setRedoStack((stack) => {
+      const next = stack.at(-1);
+      if (!next) return stack;
+      setUndoStack((undo) => [...undo, { calibration, selectedKey }]);
+      setCalibration(next.calibration);
+      setSelectedKey(next.selectedKey);
+      return stack.slice(0, -1);
+    });
+  }
+
+  function toggleCalibration() {
+    setCalibrationOpen((value) => !value);
+  }
+
   return (
-    <main className="relative mx-auto min-h-screen w-[min(100%,760px)] px-3 py-3 animate-fade-in">
+    <main className="relative mx-auto min-h-screen w-[min(100%,860px)] px-3 py-3 animate-fade-in">
       <header className="flex items-start justify-between gap-4">
         <h1 className="font-medium text-primary text-xl">touch</h1>
       </header>
 
-      <details className="group" open>
-        <summary className="absolute right-3 top-3 flex h-8 cursor-pointer list-none items-center rounded-md bg-secondary px-3 text-secondary-foreground text-sm">
-          <span className="group-open:hidden">calibration</span>
-          <span className="hidden group-open:block">x</span>
-        </summary>
+      <Button className="absolute right-3 top-3 h-8 border-transparent text-sm" tabIndex={-1} variant="secondary" onMouseDown={(event) => event.preventDefault()} onClick={toggleCalibration}>
+        {calibrationOpen ? "x" : "calibration"}
+      </Button>
 
-        <div className="calibration-panel mx-auto mt-4 grid max-w-[680px] gap-3 rounded-lg bg-card p-2">
+      <div className={cn("calibration-panel mx-auto mt-4 grid max-w-[760px] gap-3 overflow-hidden rounded-lg bg-card p-2 transition-[max-height,opacity,transform,margin,padding] duration-200 ease-in-out", calibrationOpen ? "max-h-[620px] opacity-100" : "pointer-events-none mt-0 max-h-0 p-0 opacity-0 -translate-y-1")}>
             <section
               ref={previewRef}
               className="relative aspect-video w-full overflow-hidden rounded-xl bg-black"
@@ -233,8 +292,32 @@ export function App() {
               <canvas ref={canvasRef} className="h-full w-full" />
               {Object.entries(calibration.keys).map(([key, point]) => (
                 <div
-                  className="pointer-events-none absolute grid place-items-center bg-black/20 font-bold text-xs [text-shadow:0_1px_2px_#000]"
+                  className="absolute grid cursor-move touch-none place-items-center rounded-sm border-2 border-current bg-transparent font-bold text-xs"
                   key={key}
+                  onClick={(event) => event.stopPropagation()}
+                  onPointerDown={(event) => {
+                    event.stopPropagation();
+                    event.currentTarget.setPointerCapture(event.pointerId);
+                    pushCalibration();
+                  }}
+                  onPointerMove={(event) => {
+                    if (!event.currentTarget.hasPointerCapture(event.pointerId)) return;
+                    const rect = previewRef.current?.getBoundingClientRect();
+                    if (!rect) return;
+                    setCalibration((value) => ({
+                      ...value,
+                      keys: {
+                        ...value.keys,
+                        [key]: {
+                          x: Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width)),
+                          y: Math.min(1, Math.max(0, (event.clientY - rect.top) / rect.height)),
+                        },
+                      },
+                    }));
+                  }}
+                  onPointerUp={(event) => {
+                    event.currentTarget.releasePointerCapture(event.pointerId);
+                  }}
                   style={{
                     width: calibration.size,
                     height: calibration.size,
@@ -248,6 +331,21 @@ export function App() {
               ))}
             </section>
             <div className="flex flex-wrap items-end gap-3">
+              {cameras.length > 0 && <label className="grid min-w-44 flex-[2] gap-1 text-xs">
+                <span className="text-muted-foreground">camera</span>
+                <Select value={selectedCamera} onValueChange={setSelectedCamera}>
+                  <SelectTrigger className="border-transparent bg-background text-foreground">
+                    <SelectValue placeholder="choose source" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {cameras.map((camera, index) => (
+                        <SelectItem key={camera.deviceId} value={camera.deviceId}>{camera.label || `camera ${index + 1}`}</SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </label>}
               <label className="grid min-w-36 flex-1 gap-1 text-xs">
                 <span className="text-muted-foreground">key</span>
                 <Select value={selectedKey} onValueChange={setSelectedKey}>
@@ -263,21 +361,27 @@ export function App() {
               </label>
               <label className="grid min-w-44 flex-[2] gap-1 text-xs">
                 <span className="text-muted-foreground">marker size</span>
-                <input className="h-8 w-full accent-primary" type="range" min="14" max="80" value={calibration.size} onChange={(event) => setCalibration((value) => ({ ...value, size: Number(event.target.value) }))} />
+                <input className="h-8 w-full accent-primary" type="range" min="14" max="80" value={calibration.size} onPointerDown={pushCalibration} onChange={(event) => setCalibration((value) => ({ ...value, size: Number(event.target.value) }))} />
               </label>
-              <Button className="h-8 border-transparent text-xs" variant="secondary" onClick={() => setCalibration(defaultCalibration)}>clear</Button>
+              <Button className="h-8 border-transparent text-xs" disabled={!undoStack.length} variant="secondary" onClick={undoCalibration}>undo</Button>
+              <Button className="h-8 border-transparent text-xs" disabled={!redoStack.length} variant="secondary" onClick={redoCalibration}>redo</Button>
+              <Button className="h-8 border-transparent text-xs" variant="secondary" onClick={() => {
+                pushCalibration();
+                setCalibration(defaultCalibration);
+                setSelectedKey("q");
+              }}>clear</Button>
             </div>
-        </div>
-      </details>
+      </div>
 
-      <div className="practice-stack flex min-h-[calc(100vh-52px)] flex-col items-center justify-center gap-8 pb-12">
+      <div className={cn("practice-stack flex flex-col items-center justify-center gap-8 pb-12", calibrationOpen ? "min-h-0 pt-8" : "min-h-[calc(100vh-52px)]")}>
         <div className="grid justify-items-center gap-2">
           <section className="mx-auto flex max-w-full items-center justify-center gap-4 overflow-x-auto whitespace-nowrap rounded-lg bg-card px-3 py-2 text-muted-foreground text-xs">
             <span>key <strong className="text-primary">{debug.key}</strong></span>
             <span>expected <strong className="text-primary">{debug.expected}</strong></span>
             <span>observed <strong className="text-primary">{debug.finger}</strong></span>
-            <span>result <strong className={cn(debug.result === "correct" && "text-[#9ece6a]", debug.result === "wrong" && "text-[#f7768e]")}>{debug.result}</strong></span>
+            <span>result <strong className={cn(debug.result === "correct" && "text-[#9ece6a]", debug.result === "wrong" && "text-[#ff9e64]")}>{debug.result}</strong></span>
             <span>score <strong className="text-primary">{score.correct}/{score.total} {score.total ? Math.round((score.correct / score.total) * 100) : 0}%</strong></span>
+            <span>wpm <strong className="text-primary">{wpm}</strong></span>
           </section>
         </div>
 
@@ -309,7 +413,7 @@ function Prompt({ prompt, typed }: { prompt: string; typed: string[] }) {
   }, [prompt, typed.length]);
 
   return (
-    <div ref={containerRef} className="relative mx-auto max-w-[680px] select-none text-left text-[clamp(22px,3vw,32px)] text-muted-foreground leading-snug">
+    <div ref={containerRef} className="relative mx-auto max-w-[760px] select-none text-left text-[clamp(22px,3vw,32px)] text-muted-foreground leading-snug">
       <span
         className="absolute h-[1.2em] w-0.5 rounded-full bg-primary transition-[left,top] duration-100 ease-out"
         style={{ left: caretLeft, top: caretTop }}
@@ -318,7 +422,7 @@ function Prompt({ prompt, typed }: { prompt: string; typed: string[] }) {
         <span
           className={cn(
             "transition-colors duration-100",
-            typed[index] != null && (typed[index] === char.toLowerCase() ? "text-foreground" : "text-[#f7768e]"),
+            typed[index] != null && (typed[index] === char.toLowerCase() ? "text-foreground" : "text-[#ff9e64]"),
           )}
           key={`${char}-${index}`}
           ref={(element) => {
@@ -377,7 +481,7 @@ function extractFingers(hands: NormalizedLandmark[][], videoRect: { x: number; y
       return {
         hand,
         finger,
-        x: (videoRect.x + (1 - point.x) * videoRect.width) / width,
+        x: (videoRect.x + point.x * videoRect.width) / width,
         y: (videoRect.y + point.y * videoRect.height) / height,
       };
     }),
@@ -386,7 +490,7 @@ function extractFingers(hands: NormalizedLandmark[][], videoRect: { x: number; y
 
 function drawHands(ctx: CanvasRenderingContext2D, hands: NormalizedLandmark[][], videoRect: { x: number; y: number; width: number; height: number }) {
   for (const landmarks of hands) {
-    const points = landmarks.map((point) => ({ x: videoRect.x + (1 - point.x) * videoRect.width, y: videoRect.y + point.y * videoRect.height }));
+    const points = landmarks.map((point) => ({ x: videoRect.x + point.x * videoRect.width, y: videoRect.y + point.y * videoRect.height }));
     ctx.lineWidth = 2;
     ctx.strokeStyle = "#a9b1d6";
     for (const [start, end] of palmLines) drawLine(ctx, points[start], points[end]);

@@ -29,7 +29,7 @@ function SelectContent({ className, children, position = "popper", ...props }: R
     <SelectPrimitive.Portal>
       <SelectPrimitive.Content
         className={cn(
-          "z-50 max-h-72 min-w-[8rem] overflow-hidden rounded-md bg-card text-card-foreground shadow-xl shadow-black/30 data-[state=open]:animate-fade-in",
+          "z-50 max-h-72 min-w-[8rem] overflow-hidden rounded-md bg-card text-card-foreground shadow-xl shadow-black/30 data-[state=open]:animate-select-open",
           position === "popper" && "data-[side=bottom]:translate-y-1 data-[side=top]:-translate-y-1",
           className,
         )}
@@ -46,7 +46,7 @@ function SelectItem({ className, children, ...props }: React.ComponentProps<type
   return (
     <SelectPrimitive.Item
       className={cn(
-        "relative flex h-8 cursor-default select-none items-center rounded-sm px-2 pl-7 text-xs outline-none transition-colors duration-100 data-[disabled]:pointer-events-none data-[highlighted]:bg-accent data-[highlighted]:text-foreground data-[disabled]:opacity-50",
+        "relative flex h-8 cursor-default select-none items-center rounded-sm px-2 pl-7 text-xs outline-none transition-colors duration-100 data-[disabled]:pointer-events-none data-[highlighted]:bg-secondary data-[highlighted]:text-secondary-foreground data-[disabled]:opacity-50",
         className,
       )}
       {...props}

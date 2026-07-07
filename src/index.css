@@ -28,7 +28,7 @@
   --secondary-foreground: #a9b1d6;
   --muted: #414868;
   --muted-foreground: #787c99;
-  --accent: #bb9af7;
+  --accent: #3b4261;
   --border: #3b4261;
   --input: #3b4261;
   --ring: #7dcfff;
@@ -63,14 +63,14 @@ input[type="range"] {
   }
 }
 
-@keyframes calibration-open {
+@keyframes select-open {
   from {
     opacity: 0;
-    transform: translateY(-6px);
+    transform: translateY(-4px) scale(0.98);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
   }
 }
 
@@ -78,11 +78,6 @@ input[type="range"] {
   animation: fade-in 120ms ease-out;
 }
 
-details[open] .calibration-panel {
-  animation: calibration-open 160ms ease-out;
-}
-
-details[open] + .practice-stack {
-  min-height: auto;
-  padding-top: 2rem;
+.animate-select-open {
+  animation: select-open 120ms ease-out;
 }
