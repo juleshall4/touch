@@ -81,7 +81,14 @@ export function App() {
     let landmarker: HandLandmarker | null = null;
 
     async function start() {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+          aspectRatio: { ideal: 16 / 9 },
+        },
+        audio: false,
+      });
       if (!videoRef.current) return;
       videoRef.current.srcObject = stream;
       await videoRef.current.play();
@@ -163,7 +170,6 @@ export function App() {
   }, [calibration, prompt]);
 
   const heatmap = useMemo(() => keyStats, [keyStats]);
-  const keyShapes = useMemo(() => buildKeyShapes(calibration.corners), [calibration]);
 
   function resetPractice() {
     setDebug({ key: "-", expected: "-", finger: "-", hand: "-", result: "-", hint: "press any letter key" });
@@ -175,7 +181,7 @@ export function App() {
 
   function scoreKey(key: string) {
     const expected = expectedFingerByKey[key];
-    const observed = pressedFinger(key, keyShapes, fingersRef.current);
+    const observed = pressedFinger(key, calibration, fingersRef.current, previewRef.current);
     const correct = observed.finger === expected;
     setDebug({
       key: label(key),
@@ -196,79 +202,60 @@ export function App() {
     }));
   }
 
-  function moveCorner(event: React.PointerEvent<HTMLElement>, corner = draggingCorner) {
-    if (corner == null) return;
+  function placeKey(event: React.MouseEvent<HTMLElement>) {
     const rect = previewRef.current?.getBoundingClientRect();
     if (!rect) return;
-    const point = {
-      x: Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width)),
-      y: Math.min(1, Math.max(0, (event.clientY - rect.top) / rect.height)),
-    };
     setCalibration((value) => {
-      const corners = [...value.corners] as Calibration["corners"];
-      corners[corner] = point;
-      return { corners };
+      return {
+        ...value,
+        keys: {
+          ...value.keys,
+          [selectedKey]: {
+            x: Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width)),
+            y: Math.min(1, Math.max(0, (event.clientY - rect.top) / rect.height)),
+          },
+        },
+      };
     });
+    const next = keys[keys.indexOf(selectedKey) + 1];
+    if (next) setSelectedKey(next);
   }
 
   return (
-    <main className="mx-auto w-full max-w-[900px] px-3 py-3">
+    <main className="mx-auto w-full max-w-[820px] px-3 py-3">
       <header className="mb-2 flex items-center justify-between gap-4">
         <h1 className="font-medium text-[#e2b714] text-xl">Touch</h1>
         <div className="flex items-center gap-2 text-muted-foreground text-xs">
-          <Button variant="secondary" onClick={() => setCalibration(defaultCalibration)}><RotateCcw className="h-4 w-4" />reset warp</Button>
+          <select className="h-8 rounded-md border border-input bg-card px-2 text-card-foreground" value={selectedKey} onChange={(event) => setSelectedKey(event.target.value)}>
+            {keys.map((key) => <option key={key} value={key}>{label(key)}</option>)}
+          </select>
+          <input className="w-24" type="range" min="14" max="80" value={calibration.size} onChange={(event) => setCalibration((value) => ({ ...value, size: Number(event.target.value) }))} />
+          <Button variant="secondary" onClick={() => setCalibration(defaultCalibration)}>clear</Button>
           <span>{status}</span>
         </div>
       </header>
 
       <section
         ref={previewRef}
-        className="relative aspect-video overflow-hidden rounded-md border border-border bg-black touch-none"
-        onPointerMove={moveCorner}
-        onPointerUp={() => setDraggingCorner(null)}
-        onPointerLeave={() => setDraggingCorner(null)}
+        className="relative mx-auto aspect-video w-full max-w-[760px] overflow-hidden rounded-md border border-border bg-black"
+        onClick={placeKey}
       >
         <video ref={videoRef} className="hidden" playsInline muted />
         <canvas ref={canvasRef} className="h-full w-full" />
-        <svg className="absolute inset-0 h-full w-full" viewBox="0 0 1 1" preserveAspectRatio="none">
-          {keyShapes.map((shape) => (
-            <polygon
-              fill="rgba(0,0,0,0.12)"
-              key={shape.key}
-              points={shape.polygon.map((point) => `${point.x},${point.y}`).join(" ")}
-              stroke={fingerColors[expectedFingerByKey[shape.key]] || "#e2b714"}
-              strokeWidth="0.003"
-            />
-          ))}
-          {keyShapes.map((shape) => (
-            <text
-              dominantBaseline="middle"
-              fill={fingerColors[expectedFingerByKey[shape.key]] || "#e2b714"}
-              fontSize="0.018"
-              fontWeight="700"
-              key={`${shape.key}-label`}
-              textAnchor="middle"
-              x={shape.center.x}
-              y={shape.center.y}
-            >
-              {label(shape.key)}
-            </text>
-          ))}
-          <polygon fill="none" points={calibration.corners.map((point) => `${point.x},${point.y}`).join(" ")} stroke="#e2b714" strokeWidth="0.006" />
-        </svg>
-        {calibration.corners.map((point, index) => (
-          <button
-            aria-label={`drag corner ${index + 1}`}
-            className="absolute h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-black bg-primary shadow"
-            key={index}
-            onPointerDown={(event) => {
-              event.currentTarget.setPointerCapture(event.pointerId);
-              setDraggingCorner(index);
-              moveCorner(event, index);
+        {Object.entries(calibration.keys).map(([key, point]) => (
+          <div
+            className="pointer-events-none absolute grid place-items-center border-2 bg-black/20 font-bold text-xs [text-shadow:0_1px_2px_#000]"
+            key={key}
+            style={{
+              width: calibration.size,
+              height: calibration.size,
+              left: `calc(${point.x * 100}% - ${calibration.size / 2}px)`,
+              top: `calc(${point.y * 100}% - ${calibration.size / 2}px)`,
+              color: key === selectedKey ? "#e2b714" : fingerColors[expectedFingerByKey[key]] || "#e2b714",
             }}
-            style={{ left: `${point.x * 100}%`, top: `${point.y * 100}%` }}
-            type="button"
-          />
+          >
+            {label(key)}
+          </div>
         ))}
       </section>
 
@@ -390,82 +377,27 @@ function drawLine(ctx: CanvasRenderingContext2D, a: Point, b: Point) {
   ctx.stroke();
 }
 
-function bilinear(corners: Calibration["corners"], x: number, y: number) {
-  const top = mix(corners[0], corners[1], x);
-  const bottom = mix(corners[3], corners[2], x);
-  return mix(top, bottom, y);
-}
-
-function mix(a: Point, b: Point, t: number) {
-  return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
-}
-
-function buildKeyShapes(corners: Calibration["corners"]): KeyShape[] {
-  return keyboardRows.flatMap((row, rowIndex) => {
-    const rowHeight = 1 / keyboardRows.length;
-    const y1 = rowIndex * rowHeight;
-    const y2 = (rowIndex + 1) * rowHeight;
-    if (row === " ") {
-      const x1 = 0.25;
-      const x2 = 0.75;
-      return [{
-        key: " ",
-        center: bilinear(corners, 0.5, (y1 + y2) / 2),
-        polygon: [
-          bilinear(corners, x1, y1),
-          bilinear(corners, x2, y1),
-          bilinear(corners, x2, y2),
-          bilinear(corners, x1, y2),
-        ] as [Point, Point, Point, Point],
-      }];
-    }
-
-    const rowOffset = rowIndex === 0 ? 0 : rowIndex === 1 ? 0.05 : 0.1;
-    const rowWidth = 0.9;
-    return [...row].map((key, keyIndex) => {
-      const x1 = rowOffset + (keyIndex / row.length) * rowWidth;
-      const x2 = rowOffset + ((keyIndex + 1) / row.length) * rowWidth;
-      return {
-        key,
-        center: bilinear(corners, (x1 + x2) / 2, (y1 + y2) / 2),
-        polygon: [
-          bilinear(corners, x1, y1),
-          bilinear(corners, x2, y1),
-          bilinear(corners, x2, y2),
-          bilinear(corners, x1, y2),
-        ] as [Point, Point, Point, Point],
-      };
-    });
-  });
-}
-
-function pressedFinger(key: string, keyShapes: KeyShape[], fingers: FingerPoint[]) {
-  const shape = keyShapes.find((candidate) => candidate.key === key);
-  if (!shape) return { finger: "", hand: "-", hint: "key not in overlay" };
+function pressedFinger(key: string, calibration: Calibration, fingers: FingerPoint[], preview: HTMLDivElement | null) {
+  const keyPoint = calibration.keys[key];
+  if (!keyPoint) return { finger: "", hand: "-", hint: "key not calibrated" };
   if (!fingers.length) return { finger: "", hand: "-", hint: "no hands tracked" };
+  if (!preview) return { finger: "", hand: "-", hint: "preview missing" };
+
+  const rect = preview.getBoundingClientRect();
+  const halfWidth = calibration.size / rect.width / 2;
+  const halfHeight = calibration.size / rect.height / 2;
 
   const match = fingers
     .map((finger) => ({
       ...finger,
-      distance: Math.hypot(finger.x - shape.center.x, finger.y - shape.center.y),
-      inside: pointInPolygon(finger, shape.polygon),
+      distance: Math.hypot(finger.x - keyPoint.x, finger.y - keyPoint.y),
+      inside: Math.abs(finger.x - keyPoint.x) <= halfWidth && Math.abs(finger.y - keyPoint.y) <= halfHeight,
     }))
     .sort((a, b) => Number(b.inside) - Number(a.inside) || a.distance - b.distance)[0];
 
   return {
     finger: match.finger,
     hand: `hand ${match.hand + 1}`,
-    hint: match.inside ? "finger inside warped key" : "nearest tracked fingertip",
+    hint: match.inside ? "finger inside calibrated key" : "nearest tracked fingertip",
   };
-}
-
-function pointInPolygon(point: Point, polygon: Point[]) {
-  let inside = false;
-  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-    const a = polygon[i];
-    const b = polygon[j];
-    const crosses = a.y > point.y !== b.y > point.y && point.x < ((b.x - a.x) * (point.y - a.y)) / (b.y - a.y) + a.x;
-    if (crosses) inside = !inside;
-  }
-  return inside;
 }
