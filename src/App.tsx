@@ -69,7 +69,8 @@ export function App() {
   const [debug, setDebug] = useState({ key: "-", expected: "-", finger: "-", result: "-" });
   const [score, setScore] = useState({ correct: 0, total: 0 });
   const [keyStats, setKeyStats] = useState(emptyStats);
-  const [startedAt, setStartedAt] = useState<number | null>(null);
+  const [activeMs, setActiveMs] = useState(0);
+  const [lastKeyAt, setLastKeyAt] = useState<number | null>(null);
   const [sessionChars, setSessionChars] = useState(0);
   const [now, setNow] = useState(Date.now());
   const [calibrationOpen, setCalibrationOpen] = useState(true);
@@ -77,6 +78,7 @@ export function App() {
   const [selectedCamera, setSelectedCamera] = useState("");
   const [undoStack, setUndoStack] = useState<CalibrationSnapshot[]>([]);
   const [redoStack, setRedoStack] = useState<CalibrationSnapshot[]>([]);
+  const [showTabHint, setShowTabHint] = useState(true);
 
   useEffect(() => {
     let stopped = false;
@@ -148,15 +150,21 @@ export function App() {
   }, [calibration]);
 
   useEffect(() => {
-    if (!startedAt) return;
+    const timer = setTimeout(() => setShowTabHint(false), 60000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!lastKeyAt || typed.length === 0) return;
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
-  }, [startedAt]);
+  }, [lastKeyAt, typed.length]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Tab") {
         event.preventDefault();
+        setShowTabHint(false);
         resetPractice();
         return;
       }
@@ -166,11 +174,13 @@ export function App() {
       }
       const key = event.key.toLowerCase();
       if (key.length !== 1) return;
+      const pressedAt = Date.now();
       setTyped((value) => {
         if (value.length >= prompt.length) return value;
-        setStartedAt((started) => started ?? Date.now());
+        if (lastKeyAt && value.length > 0) setActiveMs((ms) => ms + pressedAt - lastKeyAt);
+        setLastKeyAt(pressedAt);
         setSessionChars((count) => count + 1);
-        setNow(Date.now());
+        setNow(pressedAt);
         const next = [...value, key];
         if (next.length === prompt.length) {
           setTimeout(() => {
@@ -183,10 +193,11 @@ export function App() {
     };
     addEventListener("keydown", onKeyDown);
     return () => removeEventListener("keydown", onKeyDown);
-  }, [calibration, prompt]);
+  }, [calibration, lastKeyAt, prompt]);
 
   const heatmap = useMemo(() => keyStats, [keyStats]);
-  const elapsedMinutes = startedAt ? Math.max((now - startedAt) / 60000, 1 / 60000) : 0;
+  const elapsedMs = activeMs + (lastKeyAt && typed.length > 0 ? now - lastKeyAt : 0);
+  const elapsedMinutes = elapsedMs ? Math.max(elapsedMs / 60000, 1 / 60000) : 0;
   const wpm = elapsedMinutes ? Math.round(sessionChars / 5 / elapsedMinutes) : 0;
 
   function resetPractice() {
@@ -385,7 +396,14 @@ export function App() {
           </section>
         </div>
 
-        <Prompt prompt={prompt} typed={typed} />
+        <div className="grid justify-items-center gap-2">
+          <Prompt prompt={prompt} typed={typed} />
+          {showTabHint && (
+            <div className="grid h-4 w-full place-items-center">
+              <p className="text-center text-muted-foreground/70 text-xs leading-none">press tab to reset text</p>
+            </div>
+          )}
+        </div>
 
         <div className="grid justify-items-center gap-2">
           <KeyLine stats={heatmap} />
