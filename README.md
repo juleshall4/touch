@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://placehold.co/1200x630/e5e7eb/6b7280?text=Touch+typing+practice+with+live+hand+tracking" alt="Touch app preview placeholder" width="100%">
+  <img src="docs/images/touch-practice.png" alt="Touch typing practice screen" width="100%">
 </p>
 
 <h1 align="center">Touch</h1>
@@ -32,7 +32,7 @@
 - Keeps calibration in local browser storage, so setup survives refreshes.
 
 <p align="center">
-  <img src="https://placehold.co/1200x675/f3f4f6/6b7280?text=Camera+preview+%2B+calibrated+keyboard+overlay" alt="Camera calibration placeholder" width="100%">
+  <img src="docs/images/touch-calibration.png" alt="Touch calibration panel with hand tracking overlay" width="100%">
 </p>
 
 ## Why It Exists
@@ -48,7 +48,7 @@ hand when another should be doing the work.
 Touch works best when the camera is looking straight down at the keyboard.
 
 <p align="center">
-  <img src="https://placehold.co/1200x620/f3f4f6/6b7280?text=Top-down+camera+view+over+keyboard" alt="Top-down camera setup placeholder" width="100%">
+  <img src="docs/images/touch-camera-view.png" alt="Top-down camera view over a keyboard" width="100%">
 </p>
 
 <p align="center">
@@ -97,7 +97,7 @@ bun run dev
 </p>
 
 <p align="center">
-  <img src="https://placehold.co/1200x520/e5e7eb/6b7280?text=Per-key+accuracy+heatmap" alt="Typing heatmap placeholder" width="100%">
+  <img src="docs/images/touch-key-progress.png" alt="Touch per-key progress panel" width="100%">
 </p>
 
 <table>
