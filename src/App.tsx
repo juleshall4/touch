@@ -1,6 +1,7 @@
 import { FilesetResolver, HandLandmarker, type NormalizedLandmark } from "@mediapipe/tasks-vision";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { quotes } from "@/quotes";
 
@@ -9,14 +10,8 @@ type Finger = "thumb" | "index" | "middle" | "ring" | "pinky";
 type FingerPoint = { hand: number; finger: Finger; x: number; y: number };
 type Calibration = { keys: Record<string, Point>; size: number };
 
-const keys = "qwertyuiopasdfghjkl;zxcvbnm,./ ".split("");
-const heatmapRows = [
-  { keys: "qwertyuiop", offset: "pl-0" },
-  { keys: "asdfghjkl;", offset: "pl-6" },
-  { keys: "zxcvbnm,./", offset: "pl-12" },
-  { keys: " ", offset: "pl-28" },
-];
-const heatmapKeys = heatmapRows.map((row) => row.keys).join("").split("");
+const keys = "qwertyuiopasdfghjkl;'zxcvbnm,./ ".split("");
+const keyRows = ["qwertyuiopasdfgh", "jkl;'zxcvbnm,./ "];
 const expectedFingerByKey: Record<string, Finger> = {
   q: "pinky", a: "pinky", z: "pinky",
   w: "ring", s: "ring", x: "ring",
@@ -25,7 +20,7 @@ const expectedFingerByKey: Record<string, Finger> = {
   y: "index", h: "index", n: "index", u: "index", j: "index", m: "index",
   i: "middle", k: "middle", ",": "middle",
   o: "ring", l: "ring", ".": "ring",
-  p: "pinky", ";": "pinky", "/": "pinky",
+  p: "pinky", ";": "pinky", ":": "pinky", "'": "pinky", "/": "pinky",
   " ": "thumb",
 };
 const fingerColors: Record<Finger, string> = {
@@ -51,7 +46,7 @@ function randomPrompt() {
 }
 
 function emptyStats() {
-  return Object.fromEntries(heatmapKeys.map((key) => [key, { correct: 0, total: 0 }])) as Record<string, { correct: number; total: number }>;
+  return Object.fromEntries(keys.map((key) => [key, { correct: 0, total: 0 }])) as Record<string, { correct: number; total: number }>;
 }
 
 function label(key: string) {
@@ -63,7 +58,6 @@ export function App() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const previewRef = useRef<HTMLDivElement>(null);
   const fingersRef = useRef<FingerPoint[]>([]);
-  const [status, setStatus] = useState("starting camera");
   const [selectedKey, setSelectedKey] = useState("q");
   const [calibration, setCalibration] = useState<Calibration>(() => {
     const saved = JSON.parse(localStorage.getItem("touchCalibration") || "null");
@@ -71,7 +65,7 @@ export function App() {
   });
   const [prompt, setPrompt] = useState(randomPrompt);
   const [typed, setTyped] = useState<string[]>([]);
-  const [debug, setDebug] = useState({ key: "-", expected: "-", finger: "-", hand: "-", result: "-", hint: "press any letter key" });
+  const [debug, setDebug] = useState({ key: "-", expected: "-", finger: "-", result: "-" });
   const [score, setScore] = useState({ correct: 0, total: 0 });
   const [keyStats, setKeyStats] = useState(emptyStats);
 
@@ -102,8 +96,6 @@ export function App() {
         runningMode: "VIDEO",
         numHands: 2,
       });
-      setStatus("tracking");
-
       const tick = () => {
         if (stopped || !videoRef.current || !canvasRef.current || !landmarker) return;
         const video = videoRef.current;
@@ -131,7 +123,7 @@ export function App() {
       tick();
     }
 
-    start().catch((error) => setStatus(error instanceof Error ? error.message : "camera failed"));
+    start().catch(console.error);
     return () => {
       stopped = true;
       cancelAnimationFrame(frame);
@@ -172,7 +164,7 @@ export function App() {
   const heatmap = useMemo(() => keyStats, [keyStats]);
 
   function resetPractice() {
-    setDebug({ key: "-", expected: "-", finger: "-", hand: "-", result: "-", hint: "press any letter key" });
+    setDebug({ key: "-", expected: "-", finger: "-", result: "-" });
     setScore({ correct: 0, total: 0 });
     setKeyStats(emptyStats());
     setPrompt(randomPrompt());
@@ -187,9 +179,7 @@ export function App() {
       key: label(key),
       expected: expected || "-",
       finger: observed.finger || "-",
-      hand: observed.hand,
       result: observed.finger && expected ? (correct ? "correct" : "wrong") : "-",
-      hint: observed.hint,
     });
     if (!observed.finger || !expected) return;
     setScore((value) => ({ correct: value.correct + (correct ? 1 : 0), total: value.total + 1 }));
@@ -222,88 +212,118 @@ export function App() {
   }
 
   return (
-    <main className="mx-auto w-[min(100%,760px)] px-3 py-3">
-      <header className="mb-2 flex items-center justify-between gap-4">
-        <h1 className="font-medium text-primary text-xl">Touch</h1>
-        <div className="flex items-center gap-3 text-muted-foreground text-xs">
-          <span>{status}</span>
-        </div>
+    <main className="relative mx-auto min-h-screen w-[min(100%,760px)] px-3 py-3 animate-fade-in">
+      <header className="flex items-start justify-between gap-4">
+        <h1 className="font-medium text-primary text-xl">touch</h1>
       </header>
 
-      <details className="group rounded-lg border border-border bg-card p-2.5 shadow-xl shadow-black/20" open>
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm">
-          <span className="font-medium text-primary">calibration</span>
-          <span className="rounded border border-border px-1.5 text-muted-foreground text-xs group-open:hidden">show</span>
-          <span className="hidden rounded border border-border px-1.5 text-muted-foreground text-xs group-open:block">x</span>
+      <details className="group" open>
+        <summary className="absolute right-3 top-3 flex h-8 cursor-pointer list-none items-center rounded-md bg-secondary px-3 text-secondary-foreground text-sm">
+          <span className="group-open:hidden">calibration</span>
+          <span className="hidden group-open:block">x</span>
         </summary>
-        <div className="mt-3 grid gap-3 md:grid-cols-[1fr_180px]">
-          <section
-            ref={previewRef}
-            className="relative aspect-video w-full overflow-hidden rounded-xl border border-border bg-black shadow-2xl shadow-black/30"
-            onClick={placeKey}
-          >
-            <video ref={videoRef} className="hidden" playsInline muted />
-            <canvas ref={canvasRef} className="h-full w-full" />
-            {Object.entries(calibration.keys).map(([key, point]) => (
-              <div
-                className="pointer-events-none absolute grid place-items-center border-2 bg-black/20 font-bold text-xs [text-shadow:0_1px_2px_#000]"
-                key={key}
-                style={{
-                  width: calibration.size,
-                  height: calibration.size,
-                  left: `calc(${point.x * 100}% - ${calibration.size / 2}px)`,
-                  top: `calc(${point.y * 100}% - ${calibration.size / 2}px)`,
-                  color: key === selectedKey ? "#7dcfff" : fingerColors[expectedFingerByKey[key]] || "#7dcfff",
-                }}
-              >
-                {label(key)}
-              </div>
-            ))}
-          </section>
-          <div className="grid content-start gap-3">
-            <label className="grid gap-1 text-xs">
-              <span className="text-muted-foreground">key</span>
-              <select className="h-8 rounded-md border border-input bg-background px-2 text-foreground" value={selectedKey} onChange={(event) => setSelectedKey(event.target.value)}>
-                {keys.map((key) => <option key={key} value={key}>{label(key)}</option>)}
-              </select>
-            </label>
-            <label className="grid gap-1 text-xs">
-              <span className="text-muted-foreground">marker size</span>
-              <input className="w-full accent-primary" type="range" min="14" max="80" value={calibration.size} onChange={(event) => setCalibration((value) => ({ ...value, size: Number(event.target.value) }))} />
-            </label>
-            <Button className="h-8 w-full text-xs" variant="secondary" onClick={() => setCalibration(defaultCalibration)}>clear calibration</Button>
-          </div>
+
+        <div className="calibration-panel mx-auto mt-4 grid max-w-[680px] gap-3 rounded-lg bg-card p-2">
+            <section
+              ref={previewRef}
+              className="relative aspect-video w-full overflow-hidden rounded-xl bg-black"
+              onClick={placeKey}
+            >
+              <video ref={videoRef} className="hidden" playsInline muted />
+              <canvas ref={canvasRef} className="h-full w-full" />
+              {Object.entries(calibration.keys).map(([key, point]) => (
+                <div
+                  className="pointer-events-none absolute grid place-items-center bg-black/20 font-bold text-xs [text-shadow:0_1px_2px_#000]"
+                  key={key}
+                  style={{
+                    width: calibration.size,
+                    height: calibration.size,
+                    left: `calc(${point.x * 100}% - ${calibration.size / 2}px)`,
+                    top: `calc(${point.y * 100}% - ${calibration.size / 2}px)`,
+                    color: key === selectedKey ? "#7dcfff" : fingerColors[expectedFingerByKey[key]] || "#7dcfff",
+                  }}
+                >
+                  {label(key)}
+                </div>
+              ))}
+            </section>
+            <div className="flex flex-wrap items-end gap-3">
+              <label className="grid min-w-36 flex-1 gap-1 text-xs">
+                <span className="text-muted-foreground">key</span>
+                <Select value={selectedKey} onValueChange={setSelectedKey}>
+                  <SelectTrigger className="border-transparent bg-background text-foreground">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      {keys.map((key) => <SelectItem key={key} value={key}>{label(key)}</SelectItem>)}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </label>
+              <label className="grid min-w-44 flex-[2] gap-1 text-xs">
+                <span className="text-muted-foreground">marker size</span>
+                <input className="h-8 w-full accent-primary" type="range" min="14" max="80" value={calibration.size} onChange={(event) => setCalibration((value) => ({ ...value, size: Number(event.target.value) }))} />
+              </label>
+              <Button className="h-8 border-transparent text-xs" variant="secondary" onClick={() => setCalibration(defaultCalibration)}>clear</Button>
+            </div>
         </div>
       </details>
 
-      <Prompt prompt={prompt} typed={typed} />
+      <div className="practice-stack flex min-h-[calc(100vh-52px)] flex-col items-center justify-center gap-8 pb-12">
+        <div className="grid justify-items-center gap-2">
+          <section className="mx-auto flex max-w-full items-center justify-center gap-4 overflow-x-auto whitespace-nowrap rounded-lg bg-card px-3 py-2 text-muted-foreground text-xs">
+            <span>key <strong className="text-primary">{debug.key}</strong></span>
+            <span>expected <strong className="text-primary">{debug.expected}</strong></span>
+            <span>observed <strong className="text-primary">{debug.finger}</strong></span>
+            <span>result <strong className={cn(debug.result === "correct" && "text-[#9ece6a]", debug.result === "wrong" && "text-[#f7768e]")}>{debug.result}</strong></span>
+            <span>score <strong className="text-primary">{score.correct}/{score.total} {score.total ? Math.round((score.correct / score.total) * 100) : 0}%</strong></span>
+          </section>
+        </div>
 
-      <section className="mt-3 flex flex-wrap gap-x-5 gap-y-2 rounded-lg border border-border bg-card p-2.5 text-muted-foreground text-sm">
-        <span>key <strong className="text-primary">{debug.key}</strong></span>
-        <span>expected <strong className="text-primary">{debug.expected}</strong></span>
-        <span>observed <strong className="text-primary">{debug.finger}</strong></span>
-        <span>hand <strong className="text-primary">{debug.hand}</strong></span>
-        <span>result <strong className={cn(debug.result === "correct" && "text-[#40ff40]", debug.result === "wrong" && "text-[#ca4754]")}>{debug.result}</strong></span>
-        <span>score <strong className="text-primary">{score.correct}/{score.total} {score.total ? Math.round((score.correct / score.total) * 100) : 0}%</strong></span>
-        <span>{debug.hint}</span>
-      </section>
+        <Prompt prompt={prompt} typed={typed} />
 
-      <KeyboardHeatmap stats={heatmap} />
+        <div className="grid justify-items-center gap-2">
+          <KeyLine stats={heatmap} />
+        </div>
+      </div>
+
     </main>
   );
 }
 
 function Prompt({ prompt, typed }: { prompt: string; typed: string[] }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const charRefs = useRef<(HTMLSpanElement | null)[]>([]);
+  const [caretLeft, setCaretLeft] = useState(0);
+  const [caretTop, setCaretTop] = useState(0);
+
+  useLayoutEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const target = charRefs.current[typed.length];
+    const containerRect = container.getBoundingClientRect();
+    const targetRect = target?.getBoundingClientRect();
+    setCaretLeft(targetRect ? targetRect.left - containerRect.left : container.scrollWidth);
+    setCaretTop(targetRect ? targetRect.top - containerRect.top : 0);
+  }, [prompt, typed.length]);
+
   return (
-    <div className="mt-3 select-none text-[clamp(18px,3vw,28px)] text-muted-foreground leading-snug">
+    <div ref={containerRef} className="relative mx-auto max-w-[680px] select-none text-left text-[clamp(22px,3vw,32px)] text-muted-foreground leading-snug">
+      <span
+        className="absolute h-[1.2em] w-0.5 rounded-full bg-primary transition-[left,top] duration-100 ease-out"
+        style={{ left: caretLeft, top: caretTop }}
+      />
       {[...prompt].map((char, index) => (
         <span
           className={cn(
-            "border-l-2 border-transparent",
+            "transition-colors duration-100",
             typed[index] != null && (typed[index] === char.toLowerCase() ? "text-foreground" : "text-[#f7768e]"),
-            index === typed.length && "border-l-primary",
           )}
           key={`${char}-${index}`}
+          ref={(element) => {
+            charRefs.current[index] = element;
+          }}
         >
           {char}
         </span>
@@ -312,39 +332,35 @@ function Prompt({ prompt, typed }: { prompt: string; typed: string[] }) {
   );
 }
 
-function KeyboardHeatmap({ stats }: { stats: Record<string, { correct: number; total: number }> }) {
+function KeyLine({ stats }: { stats: Record<string, { correct: number; total: number }> }) {
   return (
-    <section className="mt-3 flex justify-center">
-      <div className="w-fit rounded-lg border border-border bg-card p-2.5">
-        <div className="flex flex-col gap-1">
-          {heatmapRows.map((row) => (
-            <div className={cn("flex gap-1", row.offset)} key={row.keys}>
-              {[...row.keys].map((key) => (
-                <div
-                  className={cn(
-                    "h-7 rounded-md border border-black/30 text-center font-medium text-[#111] shadow-inner",
-                    key === " " ? "w-48 text-xs leading-7" : "w-8 text-sm leading-7",
-                  )}
-                  key={key}
-                  style={{ background: heatColor(stats[key]) }}
-                >
-                  {label(key)}
-                </div>
-              ))}
-            </div>
-          ))}
-        </div>
+    <section className="flex justify-center">
+      <div className="grid max-w-full gap-1 overflow-x-auto">
+        {keyRows.map((row) => (
+          <div className="flex justify-center gap-1" key={row}>
+            {[...row].map((key) => (
+              <span
+                className={cn(
+                  "grid h-8 shrink-0 place-items-center rounded border border-border text-[11px] text-muted-foreground",
+                  key === " " ? "w-14" : "w-8",
+                )}
+                key={key}
+                style={{ backgroundColor: keyColor(stats[key]) }}
+              >
+                {label(key)}
+              </span>
+            ))}
+          </div>
+        ))}
       </div>
     </section>
   );
 }
 
-function heatColor(stat = { correct: 0, total: 0 }) {
-  const accuracy = stat.total ? stat.correct / stat.total : 1;
-  const red = Math.round(247 + (158 - 247) * accuracy);
-  const green = Math.round(118 + (206 - 118) * accuracy);
-  const blue = Math.round(142 + (106 - 142) * accuracy);
-  return `rgb(${red}, ${green}, ${blue})`;
+function keyColor(stat = { correct: 0, total: 0 }) {
+  if (!stat.total) return "transparent";
+  const accuracy = stat.correct / stat.total;
+  return `color-mix(in srgb, transparent ${Math.round((1 - accuracy) * 100)}%, #24283B)`;
 }
 
 function containRect(sourceWidth: number, sourceHeight: number, targetWidth: number, targetHeight: number) {
@@ -397,9 +413,9 @@ function drawLine(ctx: CanvasRenderingContext2D, a: Point, b: Point) {
 
 function pressedFinger(key: string, calibration: Calibration, fingers: FingerPoint[], preview: HTMLDivElement | null) {
   const keyPoint = calibration.keys[key];
-  if (!keyPoint) return { finger: "", hand: "-", hint: "key not calibrated" };
-  if (!fingers.length) return { finger: "", hand: "-", hint: "no hands tracked" };
-  if (!preview) return { finger: "", hand: "-", hint: "preview missing" };
+  if (!keyPoint) return { finger: "" };
+  if (!fingers.length) return { finger: "" };
+  if (!preview) return { finger: "" };
 
   const rect = preview.getBoundingClientRect();
   const halfWidth = calibration.size / rect.width / 2;
@@ -415,7 +431,5 @@ function pressedFinger(key: string, calibration: Calibration, fingers: FingerPoi
 
   return {
     finger: match.finger,
-    hand: `hand ${match.hand + 1}`,
-    hint: match.inside ? "finger inside calibrated key" : "nearest tracked fingertip",
   };
 }

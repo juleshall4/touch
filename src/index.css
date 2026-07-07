@@ -45,3 +45,44 @@ body {
   color: var(--foreground);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
+
+summary::-webkit-details-marker {
+  display: none;
+}
+
+input[type="range"] {
+  cursor: pointer;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes calibration-open {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fade-in 120ms ease-out;
+}
+
+details[open] .calibration-panel {
+  animation: calibration-open 160ms ease-out;
+}
+
+details[open] + .practice-stack {
+  min-height: auto;
+  padding-top: 2rem;
+}
