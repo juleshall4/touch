@@ -1,2 +1,7 @@
 .DS_Store
 DerivedData/
+node_modules/
+dist/
+.venv/
+*.egg-info/
+models/
