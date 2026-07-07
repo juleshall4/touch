@@ -17,6 +17,31 @@
   <code>React</code> · <code>TypeScript</code> · <code>Vite</code> · <code>Tailwind CSS</code> · <code>MediaPipe</code>
 </p>
 
+<p align="center">
+  <a href="#quick-start"><strong>Quick Start</strong></a> ·
+  <a href="#camera-setup"><strong>Camera Setup</strong></a> ·
+  <a href="#using-touch"><strong>Using Touch</strong></a>
+</p>
+
+<br>
+
+<table>
+  <tr>
+    <td width="33%" align="center">
+      <strong>See Your Hands</strong><br>
+      Browser-based hand tracking watches fingertip movement as you type.
+    </td>
+    <td width="33%" align="center">
+      <strong>Map Your Keyboard</strong><br>
+      Click each key once to line the overlay up with your real desk.
+    </td>
+    <td width="33%" align="center">
+      <strong>Fix Bad Habits</strong><br>
+      A per-key heatmap shows where your finger discipline breaks down.
+    </td>
+  </tr>
+</table>
+
 ## What It Does
 
 - Tracks both hands in the browser with MediaPipe hand landmarks.
@@ -36,6 +61,29 @@ Most typing tools only know what you typed. Touch cares how you typed it.
 That makes it useful for catching small habits that are hard to notice in the
 moment: stretching the wrong finger, drifting away from home row, or favoring one
 hand when another should be doing the work.
+
+## Camera Setup
+
+Touch works best when the camera is looking straight down at the keyboard.
+
+<table>
+  <tr>
+    <td width="50%" align="center">
+      <img src="https://placehold.co/700x460/f3f4f6/6b7280?text=Top-down+webcam+over+keyboard" alt="Top-down webcam setup placeholder" width="100%"><br>
+      <strong>Webcam Mode</strong><br>
+      Mount any decent webcam above the keyboard so both hands and every key are visible.
+    </td>
+    <td width="50%" align="center">
+      <img src="https://placehold.co/700x460/e5e7eb/6b7280?text=OV9732+camera+%2B+3D-printed+mount" alt="OV9732 camera mount placeholder" width="100%"><br>
+      <strong>OV9732 Mount Mode</strong><br>
+      Use the custom 3D-printed OV9732 camera holder for a compact, fixed top-down rig.
+    </td>
+  </tr>
+</table>
+
+<p align="center">
+  <strong>Best angle:</strong> camera above the keyboard, lens facing down, hands fully visible, keyboard filling most of the frame.
+</p>
 
 ## Quick Start
 
@@ -81,6 +129,15 @@ bun run dev
 <p align="center">
   <img src="https://placehold.co/1200x520/e5e7eb/6b7280?text=Per-key+accuracy+heatmap" alt="Typing heatmap placeholder" width="100%">
 </p>
+
+<table>
+  <tr>
+    <td align="center"><strong>Calibrate</strong><br>Click the real key positions.</td>
+    <td align="center"><strong>Type</strong><br>Work through the prompt.</td>
+    <td align="center"><strong>Compare</strong><br>Expected finger vs tracked fingertip.</td>
+    <td align="center"><strong>Improve</strong><br>Use the heatmap to clean up weak spots.</td>
+  </tr>
+</table>
 
 ## Project Shape
 
