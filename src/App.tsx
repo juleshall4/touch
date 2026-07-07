@@ -2,6 +2,7 @@ import { FilesetResolver, HandLandmarker, type NormalizedLandmark } from "@media
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { quotes } from "@/quotes";
 
 type Point = { x: number; y: number };
 type Finger = "thumb" | "index" | "middle" | "ring" | "pinky";
@@ -16,7 +17,6 @@ const heatmapRows = [
   { keys: " ", offset: "pl-28" },
 ];
 const heatmapKeys = heatmapRows.map((row) => row.keys).join("").split("");
-const wordBank = "time hand learn place index middle ring pinky thumb keyboard camera touch type focus home row fast slow clean green yellow orange red blue score practice".split(" ");
 const expectedFingerByKey: Record<string, Finger> = {
   q: "pinky", a: "pinky", z: "pinky",
   w: "ring", s: "ring", x: "ring",
@@ -29,11 +29,11 @@ const expectedFingerByKey: Record<string, Finger> = {
   " ": "thumb",
 };
 const fingerColors: Record<Finger, string> = {
-  thumb: "#0078ff",
-  index: "#40ff40",
-  middle: "#ffd400",
-  ring: "#ff9d00",
-  pinky: "#ff3b30",
+  thumb: "#7aa2f7",
+  index: "#9ece6a",
+  middle: "#e0af68",
+  ring: "#ff9e64",
+  pinky: "#f7768e",
 };
 const fingerTips: Record<Finger, number> = { thumb: 4, index: 8, middle: 12, ring: 16, pinky: 20 };
 const fingerLines: Record<Finger, number[]> = {
@@ -47,7 +47,7 @@ const palmLines = [[0, 1], [0, 5], [5, 9], [9, 13], [13, 17], [0, 17]];
 const defaultCalibration: Calibration = { keys: {}, size: 36 };
 
 function randomPrompt() {
-  return Array.from({ length: 10 }, () => wordBank[Math.floor(Math.random() * wordBank.length)]).join(" ");
+  return quotes[Math.floor(Math.random() * quotes.length)];
 }
 
 function emptyStats() {
@@ -222,46 +222,63 @@ export function App() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-[820px] px-3 py-3">
+    <main className="mx-auto w-[min(100%,760px)] px-3 py-3">
       <header className="mb-2 flex items-center justify-between gap-4">
-        <h1 className="font-medium text-[#e2b714] text-xl">Touch</h1>
-        <div className="flex items-center gap-2 text-muted-foreground text-xs">
-          <select className="h-8 rounded-md border border-input bg-card px-2 text-card-foreground" value={selectedKey} onChange={(event) => setSelectedKey(event.target.value)}>
-            {keys.map((key) => <option key={key} value={key}>{label(key)}</option>)}
-          </select>
-          <input className="w-24" type="range" min="14" max="80" value={calibration.size} onChange={(event) => setCalibration((value) => ({ ...value, size: Number(event.target.value) }))} />
-          <Button variant="secondary" onClick={() => setCalibration(defaultCalibration)}>clear</Button>
+        <h1 className="font-medium text-primary text-xl">Touch</h1>
+        <div className="flex items-center gap-3 text-muted-foreground text-xs">
           <span>{status}</span>
         </div>
       </header>
 
-      <section
-        ref={previewRef}
-        className="relative mx-auto aspect-video w-full max-w-[760px] overflow-hidden rounded-md border border-border bg-black"
-        onClick={placeKey}
-      >
-        <video ref={videoRef} className="hidden" playsInline muted />
-        <canvas ref={canvasRef} className="h-full w-full" />
-        {Object.entries(calibration.keys).map(([key, point]) => (
-          <div
-            className="pointer-events-none absolute grid place-items-center border-2 bg-black/20 font-bold text-xs [text-shadow:0_1px_2px_#000]"
-            key={key}
-            style={{
-              width: calibration.size,
-              height: calibration.size,
-              left: `calc(${point.x * 100}% - ${calibration.size / 2}px)`,
-              top: `calc(${point.y * 100}% - ${calibration.size / 2}px)`,
-              color: key === selectedKey ? "#e2b714" : fingerColors[expectedFingerByKey[key]] || "#e2b714",
-            }}
+      <details className="group rounded-lg border border-border bg-card p-2.5 shadow-xl shadow-black/20" open>
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm">
+          <span className="font-medium text-primary">calibration</span>
+          <span className="rounded border border-border px-1.5 text-muted-foreground text-xs group-open:hidden">show</span>
+          <span className="hidden rounded border border-border px-1.5 text-muted-foreground text-xs group-open:block">x</span>
+        </summary>
+        <div className="mt-3 grid gap-3 md:grid-cols-[1fr_180px]">
+          <section
+            ref={previewRef}
+            className="relative aspect-video w-full overflow-hidden rounded-xl border border-border bg-black shadow-2xl shadow-black/30"
+            onClick={placeKey}
           >
-            {label(key)}
+            <video ref={videoRef} className="hidden" playsInline muted />
+            <canvas ref={canvasRef} className="h-full w-full" />
+            {Object.entries(calibration.keys).map(([key, point]) => (
+              <div
+                className="pointer-events-none absolute grid place-items-center border-2 bg-black/20 font-bold text-xs [text-shadow:0_1px_2px_#000]"
+                key={key}
+                style={{
+                  width: calibration.size,
+                  height: calibration.size,
+                  left: `calc(${point.x * 100}% - ${calibration.size / 2}px)`,
+                  top: `calc(${point.y * 100}% - ${calibration.size / 2}px)`,
+                  color: key === selectedKey ? "#7dcfff" : fingerColors[expectedFingerByKey[key]] || "#7dcfff",
+                }}
+              >
+                {label(key)}
+              </div>
+            ))}
+          </section>
+          <div className="grid content-start gap-3">
+            <label className="grid gap-1 text-xs">
+              <span className="text-muted-foreground">key</span>
+              <select className="h-8 rounded-md border border-input bg-background px-2 text-foreground" value={selectedKey} onChange={(event) => setSelectedKey(event.target.value)}>
+                {keys.map((key) => <option key={key} value={key}>{label(key)}</option>)}
+              </select>
+            </label>
+            <label className="grid gap-1 text-xs">
+              <span className="text-muted-foreground">marker size</span>
+              <input className="w-full accent-primary" type="range" min="14" max="80" value={calibration.size} onChange={(event) => setCalibration((value) => ({ ...value, size: Number(event.target.value) }))} />
+            </label>
+            <Button className="h-8 w-full text-xs" variant="secondary" onClick={() => setCalibration(defaultCalibration)}>clear calibration</Button>
           </div>
-        ))}
-      </section>
+        </div>
+      </details>
 
       <Prompt prompt={prompt} typed={typed} />
 
-      <section className="mt-3 flex flex-wrap gap-x-5 gap-y-2 rounded-md border border-border bg-card p-2.5 text-muted-foreground text-sm">
+      <section className="mt-3 flex flex-wrap gap-x-5 gap-y-2 rounded-lg border border-border bg-card p-2.5 text-muted-foreground text-sm">
         <span>key <strong className="text-primary">{debug.key}</strong></span>
         <span>expected <strong className="text-primary">{debug.expected}</strong></span>
         <span>observed <strong className="text-primary">{debug.finger}</strong></span>
@@ -278,12 +295,12 @@ export function App() {
 
 function Prompt({ prompt, typed }: { prompt: string; typed: string[] }) {
   return (
-    <div className="mt-2 select-none text-[clamp(18px,3vw,28px)] text-muted-foreground leading-snug">
+    <div className="mt-3 select-none text-[clamp(18px,3vw,28px)] text-muted-foreground leading-snug">
       {[...prompt].map((char, index) => (
         <span
           className={cn(
             "border-l-2 border-transparent",
-            typed[index] != null && (typed[index] === char ? "text-[#d1d0c5]" : "text-[#ca4754]"),
+            typed[index] != null && (typed[index] === char.toLowerCase() ? "text-foreground" : "text-[#f7768e]"),
             index === typed.length && "border-l-primary",
           )}
           key={`${char}-${index}`}
@@ -298,7 +315,7 @@ function Prompt({ prompt, typed }: { prompt: string; typed: string[] }) {
 function KeyboardHeatmap({ stats }: { stats: Record<string, { correct: number; total: number }> }) {
   return (
     <section className="mt-3 flex justify-center">
-      <div className="w-fit rounded-md border border-border bg-card p-2.5">
+      <div className="w-fit rounded-lg border border-border bg-card p-2.5">
         <div className="flex flex-col gap-1">
           {heatmapRows.map((row) => (
             <div className={cn("flex gap-1", row.offset)} key={row.keys}>
@@ -324,9 +341,10 @@ function KeyboardHeatmap({ stats }: { stats: Record<string, { correct: number; t
 
 function heatColor(stat = { correct: 0, total: 0 }) {
   const accuracy = stat.total ? stat.correct / stat.total : 1;
-  const red = Math.round(202 + (64 - 202) * accuracy);
-  const green = Math.round(71 + (255 - 71) * accuracy);
-  return `rgb(${red}, ${green}, 71)`;
+  const red = Math.round(247 + (158 - 247) * accuracy);
+  const green = Math.round(118 + (206 - 118) * accuracy);
+  const blue = Math.round(142 + (106 - 142) * accuracy);
+  return `rgb(${red}, ${green}, ${blue})`;
 }
 
 function containRect(sourceWidth: number, sourceHeight: number, targetWidth: number, targetHeight: number) {
@@ -354,7 +372,7 @@ function drawHands(ctx: CanvasRenderingContext2D, hands: NormalizedLandmark[][],
   for (const landmarks of hands) {
     const points = landmarks.map((point) => ({ x: videoRect.x + (1 - point.x) * videoRect.width, y: videoRect.y + point.y * videoRect.height }));
     ctx.lineWidth = 2;
-    ctx.strokeStyle = "#b4b4b4";
+    ctx.strokeStyle = "#a9b1d6";
     for (const [start, end] of palmLines) drawLine(ctx, points[start], points[end]);
     for (const finger of Object.keys(fingerLines) as Finger[]) {
       ctx.strokeStyle = fingerColors[finger];

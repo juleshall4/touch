@@ -143,3 +143,6 @@ Touch is early, local-first, and intentionally small. Calibration is manual
 because it keeps the first version understandable and lets the app adapt to real
 desks, cameras, keyboards, and lighting without pretending the physical world is
 tidier than it is.
+
+The practice prompts are short quotes filtered from the reusable
+[dwyl/quotes](https://github.com/dwyl/quotes) collection.
