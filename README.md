@@ -1,12 +1,21 @@
-# Touch
+<p align="center">
+  <img src="https://placehold.co/1200x630/e5e7eb/6b7280?text=Touch+typing+practice+with+live+hand+tracking" alt="Touch app preview placeholder" width="100%">
+</p>
 
-![Touch app preview placeholder](https://placehold.co/1200x630/e5e7eb/6b7280?text=Touch+typing+practice+with+live+hand+tracking)
+<h1 align="center">Touch</h1>
 
-Touch is a playful typing practice app that watches your hands while you type.
-It uses your camera to track fingertips, compares each keypress with the finger
-that should have pressed it, and turns practice into a quick feedback loop.
+<p align="center">
+  <strong>Make touch typing visible.</strong>
+</p>
 
-The goal is simple: make touch typing visible.
+<p align="center">
+  A playful typing practice app that watches your hands while you type, tracks
+  your fingertips, and turns each keypress into feedback you can actually see.
+</p>
+
+<p align="center">
+  <code>React</code> · <code>TypeScript</code> · <code>Vite</code> · <code>Tailwind CSS</code> · <code>MediaPipe</code>
+</p>
 
 ## What It Does
 
@@ -16,7 +25,9 @@ The goal is simple: make touch typing visible.
 - Shows a live prompt, score, debug readout, and per-key heatmap.
 - Keeps calibration in local browser storage, so setup survives refreshes.
 
-![Camera calibration placeholder](https://placehold.co/1200x675/f3f4f6/6b7280?text=Camera+preview+%2B+calibrated+keyboard+overlay)
+<p align="center">
+  <img src="https://placehold.co/1200x675/f3f4f6/6b7280?text=Camera+preview+%2B+calibrated+keyboard+overlay" alt="Camera calibration placeholder" width="100%">
+</p>
 
 ## Why It Exists
 
@@ -28,19 +39,32 @@ hand when another should be doing the work.
 
 ## Quick Start
 
-Install dependencies:
+<table>
+  <tr>
+    <td><strong>1. Install</strong></td>
+    <td>
 
 ```sh
 bun install
 ```
 
-Run the app:
+  </td>
+  </tr>
+  <tr>
+    <td><strong>2. Run</strong></td>
+    <td>
 
 ```sh
 bun run dev
 ```
 
-Then open the local URL from Vite and allow camera access.
+  </td>
+  </tr>
+  <tr>
+    <td><strong>3. Open</strong></td>
+    <td>Open the local URL from Vite and allow camera access.</td>
+  </tr>
+</table>
 
 ## Using Touch
 
@@ -50,9 +74,13 @@ Then open the local URL from Vite and allow camera access.
 4. Repeat until the keyboard overlay matches your real keyboard.
 5. Type the prompt and watch the score, status, and heatmap update.
 
-Press `Tab` to reset the practice round.
+<p align="center">
+  <strong>Tip:</strong> press <code>Tab</code> to reset the practice round.
+</p>
 
-![Typing heatmap placeholder](https://placehold.co/1200x520/e5e7eb/6b7280?text=Per-key+accuracy+heatmap)
+<p align="center">
+  <img src="https://placehold.co/1200x520/e5e7eb/6b7280?text=Per-key+accuracy+heatmap" alt="Typing heatmap placeholder" width="100%">
+</p>
 
 ## Project Shape
 
@@ -73,12 +101,14 @@ bun run preview  # preview the production build
 
 ## Tech
 
-- React 19
-- TypeScript
-- Vite
-- Tailwind CSS 4
-- MediaPipe Tasks Vision
-- Bun
+<p align="center">
+  <code>React 19</code>
+  <code>TypeScript</code>
+  <code>Vite</code>
+  <code>Tailwind CSS 4</code>
+  <code>MediaPipe Tasks Vision</code>
+  <code>Bun</code>
+</p>
 
 ## Notes
 
