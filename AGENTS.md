@@ -22,7 +22,6 @@ Touch is a fun project designed for tracking hand placement when practicing touc
 ## Rules
 
 - For any file search or grep in the current git-indexed directory, use fff tools.
-- Only keep and update Jupyter notebooks used by Blender scripts. Do not add notebooks for other features.
 - Prefer the simplest clean implementation that can be extended later.
 - Always refer to me as King Julian.
 - Avoid comments unless they are necessary.
